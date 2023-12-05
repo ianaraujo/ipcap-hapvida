@@ -2,14 +2,13 @@ import os
 import requests
 import tempfile
 import zipfile
+import pandas as pd
 from bs4 import BeautifulSoup
 
 BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/"
 
-url_list = [BASE_URL + str(year) for year in range(2007, 2024)]
-
-
-def find_files(url_list):
+def find_files(start_year, end_year):
+    url_list = [BASE_URL + str(year) for year in range(start_year, end_year)]
     zip_urls = []
 
     for url in url_list:
@@ -24,25 +23,28 @@ def find_files(url_list):
                 zip_urls.append(os.path.join(url, href))
     return zip_urls
 
+def fetch_files(zip_urls):
+    with tempfile.TemporaryDirectory(dir='.') as temp_dir:
+        for url in zip_urls:
+            response = requests.get(url)
+            zip_file_path = os.path.join(temp_dir, os.path.basename(url))
 
-zip_urls = find_files(url_list)
+            with open(zip_file_path, 'wb') as f:
+                f.write(response.content)
 
-with tempfile.TemporaryDirectory() as temp_dir:
-    for url in zip_urls:
-        # Download the .zip file
-        response = requests.get(url)
-        zip_file_path = os.path.join(temp_dir, os.path.basename(url))
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
 
-        # Save the .zip file to the temporary directory
-        with open(zip_file_path, 'wb') as f:
-            f.write(response.content)
+        all_csv_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.csv')]
+        df = pd.concat((pd.read_csv(f, sep=';', encoding='latin1', on_bad_lines='warn') for f in all_csv_files), ignore_index=True)
+    return df
 
-        # Extract the .zip file
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
+def download_data(start_year, end_year):
+    zip_urls = find_files(start_year, end_year)
+    df = fetch_files(zip_urls)
+    return df
 
-    # Read all CSV files into a single DataFrame
-    all_csv_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.csv')]
-    df = pd.concat((pd.read_csv(f) for f in all_csv_files), ignore_index=True)
+if __name__ == "__main__":
 
-print(df)
+    df = download_data(2015, 2024)
+    print(df.head(10))
