@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/"
 
 def find_files(start_year, end_year):
-    url_list = [BASE_URL + str(year) for year in range(start_year, end_year)]
+    url_list = [BASE_URL + str(year) for year in range(start_year, end_year + 1)]
     zip_urls = []
 
     for url in url_list:
