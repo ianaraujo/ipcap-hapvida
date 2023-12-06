@@ -36,7 +36,7 @@ def fetch_files(zip_urls):
                 zip_ref.extractall(temp_dir)
 
         all_csv_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.csv')]
-        df = pd.concat((pd.read_csv(f, sep=';', encoding='latin1', on_bad_lines='warn') for f in all_csv_files), ignore_index=True)
+        df = pd.concat((pd.read_csv(f, sep=';', encoding='latin1', on_bad_lines='skip') for f in all_csv_files), ignore_index=True)
     return df
 
 def download_data(start_year, end_year):
