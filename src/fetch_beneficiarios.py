@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import pandas as pd
+import numpy as np
 
 from bs4 import BeautifulSoup
 from requests.exceptions import HTTPError
@@ -38,11 +39,9 @@ def process_url(session, url, output_dir):
             with ZipFile(BytesIO(response.content), 'r') as zip_ref:
                 csv_file = zip_ref.namelist()[0]  # assuming there's only one CSV file in the zip
                 
-                df = pd.read_csv(
-                    zip_ref.open(csv_file), sep=';', encoding='latin1', on_bad_lines='skip', 
-                    usecols=['CD_OPERADORA', 'COBERTURA_ASSIST_PLAN'], 
-                    dtype={'CD_OPERADORA': 'int32', 'COBERTURA_ASSIST_PLAN': 'category'}
-                )
+                df = pd.read_csv(zip_ref.open(csv_file), sep=';', encoding='latin1', on_bad_lines='skip', usecols=['#ID_CMPT_MOVEL', 'CD_OPERADORA', 'COBERTURA_ASSIST_PLAN', 'QT_BENEFICIARIO_ATIVO'])
+                
+                df['COBERTURA_ASSIST_PLAN'] = np.where(df['COBERTURA_ASSIST_PLAN'] == 'Médico-hospitalar', 1, 0)
         
         df_list.append(df)
 
@@ -51,6 +50,8 @@ def process_url(session, url, output_dir):
     processed_csv_path = os.path.join(output_dir, url[-6:] + '.csv')
         
     df_all.to_csv(processed_csv_path, index=False)
+
+    print(f"File saved to: {processed_csv_path}")
 
 def find_files(output_dir, years, months):
     if not os.path.exists(output_dir):
@@ -64,7 +65,7 @@ def find_files(output_dir, years, months):
 
 if __name__ == "__main__":
     start_time = time.time()
-    find_files('data/', [2022, 2023], [3, 6, 9, 12])
+    find_files('data/', [2022], [3, 6, 9, 12])
     end_time = time.time()
 
     print(f"Execution time: {round((end_time - start_time)/60, 2)} minutes")
