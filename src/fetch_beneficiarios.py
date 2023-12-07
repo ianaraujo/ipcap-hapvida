@@ -1,11 +1,11 @@
 import os
 import time
 import requests
-import tempfile
 import pandas as pd
 
 from bs4 import BeautifulSoup
 from requests.exceptions import HTTPError
+from io import BytesIO
 from zipfile import ZipFile
 
 BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios/"
@@ -45,29 +45,15 @@ def find_files(output_dir, years, months, url=BASE_URL):
             for zurl in zip_urls:
                 with session.get(zurl, stream=True) as response:
                     response.raise_for_status()
-                    
-                    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_zip:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            temp_zip.write(chunk)
-                        temp_zip_path = temp_zip.name
 
-                # Extract the CSV file
-                with ZipFile(temp_zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(tempfile.gettempdir())
-                    csv_file = zip_ref.namelist()[0]  # assuming there's only one CSV file in the zip
-                    csv_path = os.path.join(tempfile.gettempdir(), csv_file)
+                    with ZipFile(BytesIO(response.content), 'r') as zip_ref:
+                        csv_file = zip_ref.namelist()[0]  # assuming there's only one CSV file in the zip
+                        df = pd.read_csv(zip_ref.open(csv_file), sep=';', encoding='latin1', on_bad_lines='skip', usecols=['CD_OPERADORA', 'COBERTURA_ASSIST_PLAN'])
 
-                df = pd.read_csv(csv_path, sep=';', encoding='latin1', on_bad_lines='skip', usecols=['CD_OPERADORA', 'COBERTURA_ASSIST_PLAN'])
-                
                 df['COBERTURA_ASSIST_PLAN'] = df.COBERTURA_ASSIST_PLAN.astype('category')
-                #df['CD_OPERADORA'] = df.CD_OPERADORA.astype('int32')
-
+                
                 df_list.append(df)
 
-                # cleanup
-                os.remove(temp_zip_path)
-                os.remove(csv_path)
-            
             df_all = pd.concat(df_list, ignore_index=True)
 
             processed_csv_path = os.path.join(output_dir, url[-6:] + '.csv')
